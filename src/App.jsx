@@ -1,33 +1,69 @@
 import './App.scss'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import Settings from './components/Settings'
+import Input from './components/Input'
+import Output from './components/Output'
+import Header from './components/Header'
 
 function App() {
   const [text, setText] = useState('')
   const [convertedText, setConvertedText] = useState('')
   const [showConverted, setShowConverted] = useState(false)
-  const [maskValues, setMaskValues] = useState([''])
+  const [maskValues, setMaskValues] = useState([{ keyword: '', replacement: '' }])
+
+  // Load preferences from localStorage on mount
+  useEffect(() => {
+    const savedPreferences = localStorage.getItem('promptMaskerPreferences')
+    if (savedPreferences) {
+      try {
+        const parsed = JSON.parse(savedPreferences)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMaskValues(parsed)
+        }
+      } catch (error) {
+        console.error('Error loading preferences:', error)
+      }
+    }
+  }, [])
+
+  const handleSavePreferences = () => {
+    try {
+      localStorage.setItem('promptMaskerPreferences', JSON.stringify(maskValues))
+      alert('Preferences saved successfully!')
+    } catch (error) {
+      console.error('Error saving preferences:', error)
+      alert('Error saving preferences')
+    }
+  }
 
   const handleAddMaskValue = () => {
-    setMaskValues([...maskValues, ''])
+    setMaskValues([...maskValues, { keyword: '', replacement: '' }])
   }
 
   const handleRemoveMaskValue = (index) => {
     setMaskValues(maskValues.filter((_, i) => i !== index))
   }
 
-  const handleMaskValueChange = (index, value) => {
+  const handleKeywordChange = (index, keyword) => {
     const newValues = [...maskValues]
-    newValues[index] = value
+    newValues[index] = { ...newValues[index], keyword }
+    setMaskValues(newValues)
+  }
+
+  const handleReplacementChange = (index, replacement) => {
+    const newValues = [...maskValues]
+    newValues[index] = { ...newValues[index], replacement }
     setMaskValues(newValues)
   }
 
   const handleConvert = () => {
     let result = text
-    const valuesToMask = maskValues.filter(v => v.trim() !== '')
+    const valuesToMask = maskValues.filter(v => v.keyword.trim() !== '')
     
-    valuesToMask.forEach(value => {
-      const regex = new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
-      result = result.replace(regex, 'default')
+    valuesToMask.forEach(({ keyword, replacement }) => {
+      const regex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+      const replacementValue = replacement.trim() !== '' ? replacement : 'maskedValue'
+      result = result.replace(regex, replacementValue)
     })
     
     setConvertedText(result)
@@ -36,7 +72,7 @@ function App() {
 
   return (
     <div className="min-h-screen p-8">
-      <h1 className="text-4xl text-center mb-10">Prompt masker</h1>
+      <Header />
       { false &&
       <>
         <div className='w-2/4 bg-custom-pink'>custom-pink</div>
@@ -46,40 +82,14 @@ function App() {
       </> 
       }
       
-      <div className="max-w-4xl mx-auto mb-6 p-4 bg-gray-50 rounded-lg border border-gray-300">
-        <h3 className="text-lg font-semibold mb-3">Values to mask (will be replaced with "default"):</h3>
-        <div className="space-y-2">
-          {maskValues.map((value, index) => (
-            <div key={index} className="flex gap-2 items-center">
-              <input
-                type="text"
-                value={value}
-                onChange={(e) => handleMaskValueChange(index, e.target.value)}
-                placeholder="Enter value to mask..."
-                className="flex-1 px-3 py-2 rounded-md border border-gray-400
-                           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                           bg-white text-gray-700"
-              />
-              {maskValues.length > 1 && (
-                <button
-                  onClick={() => handleRemoveMaskValue(index)}
-                  className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md
-                             transition-colors duration-200 font-medium"
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-          ))}
-          <button
-            onClick={handleAddMaskValue}
-            className="mt-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md
-                       transition-colors duration-200 font-medium"
-          >
-            + Add Value
-          </button>
-        </div>
-      </div>
+      <Settings 
+        maskValues={maskValues}
+        handleAddMaskValue={handleAddMaskValue}
+        handleRemoveMaskValue={handleRemoveMaskValue}
+        handleKeywordChange={handleKeywordChange}
+        handleReplacementChange={handleReplacementChange}
+        handleSavePreferences={handleSavePreferences}
+      />
 
       <button 
         onClick={handleConvert}
@@ -90,34 +100,9 @@ function App() {
         Convert
       </button>
 
-      <div className="grid grid-cols-2 gap-6 max-w-6xl mx-auto">
-        <div>
-          <h3 className="text-center text-2xl mb-4">Input:</h3>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Paste your prompt..."
-            className="w-full px-4 py-3 rounded-lg border border-gray-500
-                       focus:outline-none focus:ring-2 focus:ring-custom-peach-light focus:border-transparent
-                       resize-y min-h-[120px] bg-white shadow-sm
-                       placeholder:text-gray-400 text-gray-700
-                       transition-all duration-200"
-          />
-        </div>
-        
-        <div>
-          <h3 className="text-center text-2xl mb-4">Output:</h3>
-          <textarea
-            value={convertedText}
-            readOnly
-            placeholder="Converted text will appear here..."
-            className="w-full px-4 py-3 rounded-lg border border-gray-500
-                       focus:outline-none focus:ring-2 focus:ring-custom-peach-light focus:border-transparent
-                       resize-y min-h-[120px] bg-white shadow-sm
-                       placeholder:text-gray-400 text-gray-700
-                       transition-all duration-200"
-          />
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-6xl mx-auto">
+        <Input text={text} setText={setText} />
+        <Output convertedText={convertedText} />
       </div>
     </div>
   )
